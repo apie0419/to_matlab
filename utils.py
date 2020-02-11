@@ -25,6 +25,25 @@ def lin2rgb(linear):
 
     return np.round(srgb * 255.0).astype(np.uint8)
 
+def pca(x):
+
+    # x -= np.mean(x, axis = 0) 
+
+    cov = np.cov(x, rowvar = False)
+
+    evals , evecs = np.linalg.eigh(cov)
+
+    idx = np.argsort(evals)[::-1]
+    evecs = evecs[:,idx]
+    evals = evals[idx]
+
+    a = np.dot(x, evecs) 
+
+    print ("a:", a)
+    print ("COV:", cov)
+    print ("evals:", evals)
+    print ("evecs:", evecs)
+
 def load(filename):
     
     res = list()
