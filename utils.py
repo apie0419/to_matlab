@@ -1,6 +1,8 @@
 import numpy as np
 import easygui
 
+np.set_printoptions(suppress=True)
+
 def rgb2lin(srgb):
 
     ## Reference1: https://www.mathworks.com/help/images/ref/rgb2lin.html
@@ -27,22 +29,23 @@ def lin2rgb(linear):
 
 def pca(x):
 
-    # x -= np.mean(x, axis = 0) 
-
+    # x = x - np.mean(x, axis=0)
+    dof = len(x)
     cov = np.cov(x, rowvar = False)
+    latent, coeff = np.linalg.eig(cov)
+    idx = np.argsort(latent)[::-1]
+    coeff = coeff[:, idx]
+    latent = latent[idx]
+    coeff = coeff[:, :dof]
+    latent = latent[:dof]
+    
+    scores = np.dot(x, coeff) 
 
-    evals , evecs = np.linalg.eigh(cov)
+    # scores = (scores - np.mean(scores, axis=0)) / np.std(scores, axis=0)
 
-    idx = np.argsort(evals)[::-1]
-    evecs = evecs[:,idx]
-    evals = evals[idx]
+    explained = 100 * latent / np.sum(latent)
 
-    a = np.dot(x, evecs) 
-
-    print ("a:", a)
-    print ("COV:", cov)
-    print ("evals:", evals)
-    print ("evecs:", evecs)
+    return coeff.astype(np.float32), scores.astype(np.float32), latent.astype(np.float32), explained.astype(np.float32)
 
 def load(filename):
     
@@ -52,3 +55,5 @@ def load(filename):
             res.append(line.replace("\n", "").split("\t"))
 
     return np.array(res)
+
+    

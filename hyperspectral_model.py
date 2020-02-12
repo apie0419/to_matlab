@@ -1,13 +1,17 @@
 import numpy as np
-import easygui, os, colour
+import matplotlib.pyplot as plt
+import easygui, os, colour, numpy.matlib
 from utils        import *
 from numpy.linalg import inv, pinv
+
 
 base_path   = os.path.dirname(os.path.abspath(__file__))
 source_path = os.path.join(base_path, "Source Data")
 output_path = os.path.join(base_path, "Output Data")
 
 np.set_printoptions(suppress=True)
+plt.rcParams['font.sans-serif'] = ['SimHei'] 
+plt.rcParams['axes.unicode_minus'] = False 
 
 R1 = 3
 R2 = 1
@@ -70,12 +74,106 @@ LabRGB21 = (colour.XYZ_to_sRGB(spectrumXYZ.T / 100) * 255).astype(np.uint8)
 C_CIE76= np.sqrt(np.sum((Lab1 - Lab2) ** 2, 1))
 C_AvgCIE76 = np.mean(C_CIE76)
 
-RMSE_XYZ = np.sqrt(np.sum(CorrectXYZ - spectrumXYZ) ** 2 / 3)
+C_CIE2000 = colour.delta_E_CIE2000(Lab1, Lab2).T
+C_AvgCIE2000 = np.mean(C_CIE2000)
+
+i = 24
+RMSE_XYZ = np.sqrt(np.sum(CorrectXYZ[:, :i] - spectrumXYZ[:, :i]) ** 2 / 3)
 RMSE_allXYZ = np.sum(RMSE_XYZ / 24)
 
-pca(np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]], dtype=np.float32).T) # 不一樣
-# print (coeff)
+coeff, scores, latent, explained = pca(color_Rspectrum.T)
+EV = coeff[:, :12]
+alpha = scores[:, :12].T
 
-# coeff, score = pca(color_Rspectrum.T)
-# EV = coeff[:, :11]
-# alpha = score[:, :11]
+fig = plt.figure(num=f"主成分比重: {np.sum(explained[:12])}%")
+
+for i in range(12):
+    ax = fig.add_subplot(3, 4, i+1)
+    ax.plot(coeff[:, i])
+    ax.set(title=f"第{i+1}主成分({round(explained[i], 4)}%)")
+    ax.grid()
+
+plt.subplots_adjust(hspace=0.5, wspace=0.2)
+plt.show()
+
+spec_extend = np.array([
+    spectrumXYZ[0], spectrumXYZ[1], spectrumXYZ[2],
+    spectrumXYZ[0, :] * spectrumXYZ[1, :],
+    spectrumXYZ[1, :] * spectrumXYZ[2, :],
+    spectrumXYZ[2, :] * spectrumXYZ[0, :],
+    spectrumXYZ[0, :] * spectrumXYZ[1, :] * spectrumXYZ[2, :]
+])
+
+M = alpha @ pinv(spec_extend)
+
+correct_extend = np.array([
+    CorrectXYZ[0], CorrectXYZ[1], CorrectXYZ[2],
+    CorrectXYZ[0, :] * CorrectXYZ[1, :],
+    CorrectXYZ[1, :] * CorrectXYZ[2, :],
+    CorrectXYZ[2, :] * CorrectXYZ[0, :],
+    CorrectXYZ[0, :] * CorrectXYZ[1, :] * spectrumXYZ[2, :]
+])
+
+simulate_spectrum = EV @ M @ correct_extend
+
+simulate_spectrumXYZ = light_k * ((simulate_spectrum * (light @ np.ones((1, 24)))).T @ CMF).T
+
+i = 24
+
+RMSE_spectrum = np.sqrt(np.sum((simulate_spectrum[:,:i] - color_Rspectrum[:, :i]) ** 2) / 401)
+RMSE_allspectrum = np.sum(RMSE_spectrum / 24)
+
+Lab1 = colour.XYZ_to_Lab(spectrumXYZ.T / 100)
+Lab2 = colour.XYZ_to_Lab(simulate_spectrumXYZ.T / 100)
+
+LabRGB1 = (colour.XYZ_to_sRGB((inv(Ma) @ np.diag(np.diag((Ma @ d65) / (Ma @ White_light))) @ Ma @ spectrumXYZ).T / 100) * 255).astype(np.uint8)
+LabRGB2 = (colour.XYZ_to_sRGB((inv(Ma) @ np.diag(np.diag((Ma @ d65) / (Ma @ White_light))) @ Ma @ simulate_spectrumXYZ).T / 100) * 255).astype(np.uint8)
+Total_CIE76 = np.sqrt(np.sum((Lab1 - Lab2) ** 2, 1))
+Total_AvgCIE76 = np.mean(Total_CIE76)
+Total_CIE2000 = colour.delta_E_CIE2000(Lab1, Lab2).T
+Total_AvgCIE2000 = np.mean(Total_CIE2000)
+
+R3 = 2
+
+if R3 == 0:
+    
+    for i in range(24):
+        fig, ax = plt.subplots(num=f"Figure {i+1}")
+        x = list(range(len(simulate_spectrum[:, i])))
+        ax.plot(x, simulate_spectrum[:, i], label="模擬頻譜")
+        ax.plot(x, color_Rspectrum[:, i], label="量測頻譜")
+        ax.grid()
+        ax.legend()
+        plt.show()
+
+elif R3 == 1:
+    
+    fig, ax = plt.subplots(nrows=1, ncols=2, num="Position")
+    ax[0].plot(simulate_spectrum)
+    ax[0].set_title("模擬頻譜")
+    ax[0].set_xlabel("wavelength(nm)", fontsize=12)
+    ax[0].set_ylabel("Reflectivity(a.u.)", fontsize=12)
+    ax[0].grid()
+
+    ax[1].plot(color_Rspectrum)
+    ax[1].set_title("量測頻譜")
+    ax[1].set_xlabel("wavelength(nm)", fontsize=12)
+    ax[1].set_ylabel("Reflectivity(a.u.)", fontsize=12)
+    ax[1].grid()
+
+    plt.show()
+
+elif R3 == 2:
+    
+    L1 = np.tile(np.reshape(LabRGB2, (24, 1, 3)), [1, 5, 1])
+    L2 = np.tile(np.ones((24, 1, 3)) * 255, [1, 1])
+    L3 = np.tile(np.reshape(LabRGB2, (24, 1, 3)), [1, 5, 1])
+
+if not os.path.exists(output_path):
+    os.mkdir(output_path)
+
+np.savetxt(os.path.join(output_path, "C.txt"), C, delimiter="\t")
+np.savetxt(os.path.join(output_path, "M.txt"), M, delimiter="\t")
+np.savetxt(os.path.join(output_path, "EV.txt"), EV, delimiter="\t")
+np.savetxt(os.path.join(output_path, "light.txt"), light, delimiter="\t")
+np.savetxt(os.path.join(output_path, "White_light.txt"), White_light, delimiter="\t")
