@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import easygui, os, colour, numpy.matlib
+import easygui, os, colour
+from PIL          import Image
 from utils        import *
 from numpy.linalg import inv, pinv
 
@@ -11,8 +12,7 @@ output_path = os.path.join(base_path, "Output Data")
 
 np.set_printoptions(suppress=True)
 plt.rcParams['font.sans-serif'] = ['SimHei'] 
-plt.rcParams['axes.unicode_minus'] = False 
-
+plt.rcParams['axes.unicode_minus'] = False
 
 R1_choices = ['單色塊影像(可圈選範圍)','單色塊影像','已儲存的txt數據']
 
@@ -24,21 +24,48 @@ R1 = R1_choices.index(R1_choice)
 R2 = 1
 
 if R1 == 0:
-    pass
+    filename = easygui.fileopenbox("選擇圖檔中有多種色塊", default="*.*", multiple=True)
+    CameraRGB = np.zeros((3, len(filename)))
+
+    for i in range(len(filename)):
+        color_picture = np.array(Image.open(filename[i]), dtype=np.uint8)
+        position = imrect(filename[i])
+
+        CameraRGB[:, i] = np.median(np.reshape(color_picture[position[0]:position[1], position[2]:position[3], :], (-1, 3)), axis=0)
+
+
 elif R1 == 1:
-    pass
+    R2_choices = ['取平均','取中位數']
+    easygui.msgbox(title="告知說明", msg='選擇處理方式：不知道要選甚麼就選"取平均"，若色塊顏色不均勻則選"取中位數"')
+    R2_choice = easygui.buttonbox(title="RGB處理方式", choices=R2_choices)
+    if R2_choice == None:
+        R2 = 0
+    else:
+        R2 = R2_choices.index(R2_choice)
+
+    filename = easygui.fileopenbox("選擇色塊影像", default="*.*", multiple=True)
+    CameraRGB = np.zeros((3, len(filename)))
+    for i in range(len(filename)):
+        f = filename[i]
+        color_picture = np.array(Image.open(f), dtype=np.uint8)
+        if R2 == 0:
+            CameraRGB[:, i] = np.mean(np.reshape(color_picture, (-1, 3)), axis=0)
+        elif R2 == 1:
+            CameraRGB[:, i] = np.median(np.reshape(color_picture, (-1, 3)), axis=0)
+
 elif R1 == 2:
     filename = easygui.fileopenbox("讀取24色塊RGB txt", default="*.txt", filetypes=["*.txt"])
     CameraRGB = load(filename).astype(np.uint8)
 
 
-CameraRGB_3D = np.reshape(np.transpose(CameraRGB), (24, 1, 3))
+CameraRGB_3D = np.reshape(CameraRGB.T, (24, 1, 3))
 A_lin = rgb2lin(CameraRGB_3D)
 
 d65 = np.array([0.950470, 1.0000, 1.088830])
 d50 = np.array([0.96429568, 1.00000000, 0.82510460])
 B_lin = colour.chromatic_adaptation_VonKries(A_lin, d65, d50).astype(np.uint8) # 結果有誤差
-CameraRGB = np.transpose(np.reshape(lin2rgb(B_lin), (24, 3)).astype(np.double))
+print (B_lin)
+CameraRGB = np.reshape(lin2rgb(B_lin), (-1, 3)).astype(np.double).T
 CameraXYZ = np.round(np.transpose(colour.sRGB_to_XYZ(CameraRGB.T / 255.0, illuminant=colour.XYZ_to_xy(d65)) * 100), 4)
 
 filename = easygui.fileopenbox("讀取24色塊頻譜 txt", default="*.txt", filetypes=["*.txt"])
@@ -88,7 +115,7 @@ i = 24
 RMSE_XYZ = np.sqrt(np.sum(CorrectXYZ[:, :i] - spectrumXYZ[:, :i]) ** 2 / 3)
 RMSE_allXYZ = np.sum(RMSE_XYZ / 24)
 
-coeff, scores, latent, explained = pca(color_Rspectrum.T)
+coeff, scores, latent, explained = pca(color_Rspectrum.T, centered=False)
 EV = coeff[:, :12]
 alpha = scores[:, :12].T
 

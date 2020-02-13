@@ -1,5 +1,9 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 import easygui
+
+from matplotlib.widgets import RectangleSelector
 
 np.set_printoptions(suppress=True)
 
@@ -27,22 +31,28 @@ def lin2rgb(linear):
 
     return np.round(srgb * 255.0).astype(np.uint8)
 
-def pca(x):
+def pca(x, centered=True, economy=True):
 
-    # x = x - np.mean(x, axis=0)
-    dof = len(x)
-    cov = np.cov(x, rowvar = False)
+    if centered:
+        x = x - np.mean(x, axis=0)
+        dof = len(x) - 1
+    else:
+        dof = len(x)
+    
+    cov = x.T @ x
     latent, coeff = np.linalg.eig(cov)
+    coeff[:, list(range(0, coeff.shape[1], 2))] *= -1
+    coeff = coeff.astype(np.float32)
+    latent = latent.astype(np.float32)
     idx = np.argsort(latent)[::-1]
     coeff = coeff[:, idx]
     latent = latent[idx]
-    coeff = coeff[:, :dof]
-    latent = latent[:dof]
     
-    scores = np.dot(x, coeff) 
+    if economy:
+        latent = latent[:dof] / dof
+        coeff = coeff[:, :dof]
 
-    # scores = (scores - np.mean(scores, axis=0)) / np.std(scores, axis=0)
-
+    scores = np.dot(x, coeff)
     explained = 100 * latent / np.sum(latent)
 
     return coeff.astype(np.float32), scores.astype(np.float32), latent.astype(np.float32), explained.astype(np.float32)
@@ -55,3 +65,48 @@ def load(filename):
             res.append(line.replace("\n", "").split("\t"))
 
     return np.array(res)
+
+def imrect(filename):
+
+    def onselect(eclick, erelease):
+        pass
+
+    def toggle_selector(event):
+        if event.dblclick:
+            toggle_selector.RS.set_active(False)
+            plt.close()
+
+    def fix():
+        """
+            position: (x1, x2, y1, y2)
+        """
+
+        position = toggle_selector.RS.extents
+
+        return int(position[0]), int(position[1]), int(position[2]), int(position[3])
+
+    img = mpimg.imread(filename)
+
+    fig, ax = plt.subplots(num="Figure")
+    ax.imshow(img)
+
+    toggle_selector.RS = RectangleSelector(ax, onselect, drawtype='box', interactive=True)
+    fig.canvas.mpl_connect('button_press_event', toggle_selector)
+    plt.axis('off')
+    plt.show()
+
+    if toggle_selector.RS.extents == (0, 0, 0, 1):
+        return (0, img.shape[0], 0, img.shape[1])
+
+    position = fix()
+
+    return position
+
+if __name__ == "__main__":
+    a = np.array([[1, 2, 3, 4, 5, 6], [5, 6, 7, 8, 9, 10], [9, 10, 11 ,12, 13, 14]])
+    coeff, scores, latent, explained = pca(a, centered=False)
+
+    print ("coeff:", coeff)
+    print ("scores:", scores)
+    print ("latent:", latent)
+    print ("explained:", explained)
