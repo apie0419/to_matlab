@@ -55,5 +55,3 @@ def load(filename):
             res.append(line.replace("\n", "").split("\t"))
 
     return np.array(res)
-
-    

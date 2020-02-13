@@ -13,17 +13,24 @@ np.set_printoptions(suppress=True)
 plt.rcParams['font.sans-serif'] = ['SimHei'] 
 plt.rcParams['axes.unicode_minus'] = False 
 
-R1 = 3
+
+R1_choices = ['單色塊影像(可圈選範圍)','單色塊影像','已儲存的txt數據']
+
+R1_choice = easygui.buttonbox(title="24色塊影像類型", choices=R1_choices)
+if R1_choice == None:
+    exit()
+
+R1 = R1_choices.index(R1_choice)
 R2 = 1
+
 if R1 == 0:
     pass
 elif R1 == 1:
     pass
 elif R1 == 2:
-    pass
-elif R1 == 3:
     filename = easygui.fileopenbox("讀取24色塊RGB txt", default="*.txt", filetypes=["*.txt"])
     CameraRGB = load(filename).astype(np.uint8)
+
 
 CameraRGB_3D = np.reshape(np.transpose(CameraRGB), (24, 1, 3))
 A_lin = rgb2lin(CameraRGB_3D)
