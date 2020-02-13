@@ -11,7 +11,7 @@ source_path = os.path.join(base_path, "Source Data")
 output_path = os.path.join(base_path, "Output Data")
 
 np.set_printoptions(suppress=True)
-plt.rcParams['font.sans-serif'] = ['SimHei'] 
+plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei']
 plt.rcParams['axes.unicode_minus'] = False
 
 R1_choices = ['單色塊影像(可圈選範圍)','單色塊影像','已儲存的txt數據']
@@ -55,30 +55,29 @@ elif R1 == 1:
 
 elif R1 == 2:
     filename = easygui.fileopenbox("讀取24色塊RGB txt", default="*.txt", filetypes=["*.txt"])
-    CameraRGB = load(filename).astype(np.uint8)
+    CameraRGB = np.loadtxt(filename, delimiter="\t").astype(np.uint8)
 
 
 CameraRGB_3D = np.reshape(CameraRGB.T, (24, 1, 3))
 A_lin = rgb2lin(CameraRGB_3D)
 
-d65 = np.array([0.950470, 1.0000, 1.088830])
-d50 = np.array([0.96429568, 1.00000000, 0.82510460])
-B_lin = colour.chromatic_adaptation_VonKries(A_lin, d65, d50).astype(np.uint8) # 結果有誤差
-print (B_lin)
+d65 = np.array([0.95047, 1.00000000, 1.08883])
+d50 = np.array([0.96422, 1.00000, 0.82521])
+B_lin = colour.chromatic_adaptation_VonKries(A_lin, d65, d50, transform="Bradford").astype(np.uint8) # 結果有誤差
 CameraRGB = np.reshape(lin2rgb(B_lin), (-1, 3)).astype(np.double).T
 CameraXYZ = np.round(np.transpose(colour.sRGB_to_XYZ(CameraRGB.T / 255.0, illuminant=colour.XYZ_to_xy(d65)) * 100), 4)
 
 filename = easygui.fileopenbox("讀取24色塊頻譜 txt", default="*.txt", filetypes=["*.txt"])
-color_Rspectrum = load(filename).astype(np.double)
+color_Rspectrum = np.loadtxt(filename, delimiter="\t").astype(np.double)
 filename = easygui.fileopenbox("讀取光源頻譜 txt", default="*.txt", filetypes=["*.txt"])
-light = load(filename).astype(np.double)
-CMF = load(os.path.join(source_path, "CMF.txt")).astype(np.double)
+light = np.reshape(np.loadtxt(filename, delimiter="\n").astype(np.double), (-1, 1))
+CMF = np.loadtxt(os.path.join(source_path, "CMF.txt"), delimiter="\t").astype(np.double)
 light_k = round(100 / np.sum(np.matmul(CMF[:,1], light[:,0])), 4)
 spectrumXYZ = light_k * np.matmul((color_Rspectrum * light * np.ones((1, 24))).T, CMF).T
 
 Ma = np.array([
     [0.40024, 0.70760, -0.08081],
-    [-0.22603, 1.16532, 0.04570],
+    [-0.2263, 1.16532, 0.04570],
     [0, 0, 0.91822]
 ])
 
@@ -124,7 +123,8 @@ fig = plt.figure(num=f"主成分比重: {np.sum(explained[:12])}%")
 for i in range(12):
     ax = fig.add_subplot(3, 4, i+1)
     ax.plot(coeff[:, i])
-    ax.set(title=f"第{i+1}主成分({round(explained[i], 4)}%)")
+    percent = round(explained[i], 4)
+    ax.set(title=f"第{i+1}主成分({percent}%)")
     ax.grid()
 
 plt.subplots_adjust(hspace=0.5, wspace=0.2)
@@ -167,13 +167,19 @@ Total_AvgCIE76 = np.mean(Total_CIE76)
 Total_CIE2000 = colour.delta_E_CIE2000(Lab1, Lab2).T
 Total_AvgCIE2000 = np.mean(Total_CIE2000)
 
-R3 = 2
+R3_choices = ['各色塊頻譜比較','全頻譜比較','色差圖示比較']
+
+R3_choice = easygui.buttonbox(title="頻譜選取", choices=R3_choices)
+if R3_choice == None:
+    R3 = -1
+else:
+    R3 = R3_choices.index(R3_choice)
 
 if R3 == 0:
     
     for i in range(24):
         fig, ax = plt.subplots(num=f"Figure {i+1}")
-        x = list(range(len(simulate_spectrum[:, i])))
+        x = list(range(380, 380+len(simulate_spectrum[:, i])))
         ax.plot(x, simulate_spectrum[:, i], label="模擬頻譜")
         ax.plot(x, color_Rspectrum[:, i], label="量測頻譜")
         ax.grid()
@@ -187,22 +193,23 @@ elif R3 == 1:
     ax[0].set_title("模擬頻譜")
     ax[0].set_xlabel("wavelength(nm)", fontsize=12)
     ax[0].set_ylabel("Reflectivity(a.u.)", fontsize=12)
+    ax[0].set_xlim(380, 780)
     ax[0].grid()
 
     ax[1].plot(color_Rspectrum)
     ax[1].set_title("量測頻譜")
     ax[1].set_xlabel("wavelength(nm)", fontsize=12)
     ax[1].set_ylabel("Reflectivity(a.u.)", fontsize=12)
+    ax[1].set_xlim(380, 780)
     ax[1].grid()
 
     plt.show()
 
 elif R3 == 2:
-    
     L1 = np.tile(np.reshape(LabRGB2, (24, 1, 3)), [1, 5, 1])
     L2 = np.tile(np.ones((24, 1, 3)) * 255, [1, 1])
     L3 = np.tile(np.reshape(LabRGB2, (24, 1, 3)), [1, 5, 1])
-
+    
 if not os.path.exists(output_path):
     os.mkdir(output_path)
 

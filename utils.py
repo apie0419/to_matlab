@@ -57,15 +57,6 @@ def pca(x, centered=True, economy=True):
 
     return coeff.astype(np.float32), scores.astype(np.float32), latent.astype(np.float32), explained.astype(np.float32)
 
-def load(filename):
-    
-    res = list()
-    with open(filename, "r", encoding="utf-8") as f:
-        for line in f:
-            res.append(line.replace("\n", "").split("\t"))
-
-    return np.array(res)
-
 def imrect(filename):
 
     def onselect(eclick, erelease):
