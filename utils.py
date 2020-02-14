@@ -39,9 +39,9 @@ def pca(x, centered=True, economy=True):
     else:
         dof = len(x)
     
-    cov = x.T @ x
-    latent, coeff = np.linalg.eig(cov)
-    coeff[:, list(range(0, coeff.shape[1], 2))] *= -1
+    cov = np.dot(x.T, x)
+    
+    latent, coeff = np.linalg.eig(cov.astype(np.float32))
     coeff = coeff.astype(np.float32)
     latent = latent.astype(np.float32)
     idx = np.argsort(latent)[::-1]
@@ -95,9 +95,18 @@ def imrect(filename):
 
 if __name__ == "__main__":
     a = np.array([[1, 2, 3, 4, 5, 6], [5, 6, 7, 8, 9, 10], [9, 10, 11 ,12, 13, 14]])
+    b = np.array([[6, 2, 3, 10], [2, 31, 51, 20], [10, 5, 21, 15]])
+    
     coeff, scores, latent, explained = pca(a, centered=False)
-
-    print ("coeff:", coeff)
-    print ("scores:", scores)
+    # print (scores @ coeff.T)
+    print ("coeff:\n", coeff)
+    print ("scores:\n", scores)
     print ("latent:", latent)
     print ("explained:", explained)
+
+    # coeff, scores, latent, explained = pca(b, centered=False)
+
+    # print ("coeff:\n", coeff)
+    # print ("scores:\n", scores)
+    # print ("latent:", latent)
+    # print ("explained:", explained)

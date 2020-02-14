@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 import easygui, os, colour
 from PIL          import Image
 from utils        import *
@@ -118,7 +119,7 @@ coeff, scores, latent, explained = pca(color_Rspectrum.T, centered=False)
 EV = coeff[:, :12]
 alpha = scores[:, :12].T
 
-fig = plt.figure(num=f"主成分比重: {np.sum(explained[:12])}%")
+fig = plt.figure(num=f"主成分比重: {np.sum(explained[:12])}%", figsize=(18, 9))
 
 for i in range(12):
     ax = fig.add_subplot(3, 4, i+1)
@@ -176,27 +177,29 @@ else:
     R3 = R3_choices.index(R3_choice)
 
 if R3 == 0:
-    
-    for i in range(24):
+    x = list(range(380, 781))
+    for i in list(range(24))[::-1]:
         fig, ax = plt.subplots(num=f"Figure {i+1}")
-        x = list(range(380, 380+len(simulate_spectrum[:, i])))
+        
         ax.plot(x, simulate_spectrum[:, i], label="模擬頻譜")
         ax.plot(x, color_Rspectrum[:, i], label="量測頻譜")
         ax.grid()
         ax.legend()
+        
         plt.show()
+        
 
 elif R3 == 1:
-    
+    x = list(range(380, 781))
     fig, ax = plt.subplots(nrows=1, ncols=2, num="Position")
-    ax[0].plot(simulate_spectrum)
+    ax[0].plot(x, simulate_spectrum)
     ax[0].set_title("模擬頻譜")
     ax[0].set_xlabel("wavelength(nm)", fontsize=12)
     ax[0].set_ylabel("Reflectivity(a.u.)", fontsize=12)
     ax[0].set_xlim(380, 780)
     ax[0].grid()
 
-    ax[1].plot(color_Rspectrum)
+    ax[1].plot(x, color_Rspectrum)
     ax[1].set_title("量測頻譜")
     ax[1].set_xlabel("wavelength(nm)", fontsize=12)
     ax[1].set_ylabel("Reflectivity(a.u.)", fontsize=12)
@@ -206,10 +209,15 @@ elif R3 == 1:
     plt.show()
 
 elif R3 == 2:
-    L1 = np.tile(np.reshape(LabRGB2, (24, 1, 3)), [1, 5, 1])
-    L2 = np.tile(np.ones((24, 1, 3)) * 255, [1, 1])
-    L3 = np.tile(np.reshape(LabRGB2, (24, 1, 3)), [1, 5, 1])
-    
+    L1 = np.tile(np.reshape(LabRGB2, (24, 1, 3)), [1, 5, 1]).astype(np.uint8)
+    L2 = np.tile(np.ones((24, 1, 3)) * 255, [1, 1]).astype(np.uint8)
+    L3 = np.tile(np.reshape(LabRGB2, (24, 1, 3)), [1, 5, 1]).astype(np.uint8)
+    L = np.concatenate((L1, L2, L3), axis=1)
+    fig, ax = plt.subplots(num="Figure")
+    plt.axis("off")
+    ax.imshow(L)
+    plt.show()
+
 if not os.path.exists(output_path):
     os.mkdir(output_path)
 
